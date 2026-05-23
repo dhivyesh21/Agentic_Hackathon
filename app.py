@@ -39,19 +39,20 @@ st.markdown("""
     --font-ui:       'Rajdhani', sans-serif;
     --font-body:     'Inter', sans-serif;
 }
-
-[data-testid="stSidebar"] button [class*="st-"] span,
-[class*="st-emotion-cache"] svg,
-.st-emotion-cache-1aeep0r,
-[data-testid="stSidebarCollapseButton"] * {
-    font-family: "Source Sans Pro", sans-serif !important;
-}
             
 html, body, [data-testid="stAppViewContainer"] {
     background-color: var(--bg-deep) !important;
     color: var(--text-primary) !important;
 }
 
+[data-testid="stChatMessage"] [class*="st-emotion-cache"] div::after,
+[data-testid="stChatMessage"] span::after {
+    display: none !important;
+    content: "" !important;
+    font-size: 0px !important;
+    color: transparent !important;
+}
+            
 [data-testid="stSidebar"] {
     background-color: var(--bg-panel) !important;
     border-right: 1px solid var(--border-dim) !important;
@@ -67,16 +68,12 @@ h1, h2, h3, h4 {
     color: var(--accent-cyan) !important;
 }
 
-p, li, span, label, div {
+p, li, label {
     font-family: var(--font-body) !important;
 }
 
 [data-testid="stExpander"] [data-testid="stMarkdownContainer"] p {
     font-family: var(--font-body) !important;
-}
-
-.st-emotion-cache-1aeep0r, [class*="st-"] svg, [data-testid="stExpander"] div[role="button"] span {
-    font-family: "Source Sans Pro", sans-serif !important;
 }
 
 code, pre, [data-testid="stCode"] * {
@@ -462,17 +459,55 @@ with sim_col:
 
 if audit_btn:
     with st.spinner("Parsing logs against threat signatures..."):
-        st.session_state.analysis_data = agent.analyze_incident_stream(scenario_info["logs"])
-        st.session_state.chat_history  = []
-        st.session_state.audit_ran     = True
+        try:
+            st.session_state.analysis_data = agent.analyze_incident_stream(scenario_info["logs"])
+            st.session_state.chat_history = []
+            st.session_state.audit_ran = True
+        except Exception as e:
+            st.error("⚠️ Gemini API quota exceeded or service temporarily unavailable.")
+            st.code(str(e))
 
 if sim_btn:
     with st.spinner("Reconstructing attack kill chain..."):
-        st.session_state.simulation_data = agent.simulate_attack_vector(
-            selected_name, scenario_info["logs"]
-        )
+        try:
+            st.session_state.simulation_data = agent.simulate_attack_vector(selected_name, scenario_info["logs"])
+            st.rerun()
+        except Exception as e:
+            st.error("⚠️ Attack simulation temporarily unavailable.")
+            st.code(str(e))
 
 st.divider()
+
+# --- ATTACK SIMULATION CONTAINER PANEL (TOP PRIORITY STACK) ---
+sim_report = st.session_state.get("simulation_data")
+if sim_report:
+    st.markdown('<div class="section-label">⚔️ Red-Team Attack Kill Chain Simulation</div>', unsafe_allow_html=True)
+    if isinstance(sim_report, dict):
+        stages = sim_report.get("kill_chain_stages", [])
+        if stages:
+            for idx, stage in enumerate(stages, 1):
+                st.markdown(
+                    f'<div class="kill-chain-step">'
+                    f'<span class="kill-chain-num">STAGE 0{idx}</span>'
+                    f'<div style="padding-top:1px;">{stage}</div>'
+                    f'</div>', 
+                    unsafe_allow_html=True
+                )
+        else:
+            st.caption("No sequential kill chain stages reconstructed.")
+            
+        st.markdown("<br>", unsafe_allow_html=True)
+        s1, s2, s3 = st.columns(3)
+        with s1:
+            st.markdown(f'<div class="metric-card"><div class="metric-label">Blast Radius</div><div class="metric-value" style="font-size:1.1rem;color:var(--accent-amber)!important;">{sim_report.get("blast_radius","Unknown")}</div></div>', unsafe_allow_html=True)
+        with s2:
+            st.markdown(f'<div class="metric-card"><div class="metric-label">Estimated Dwell Time</div><div class="metric-value" style="font-size:1.1rem;">{sim_report.get("dwell_time_estimate","Unknown")}</div></div>', unsafe_allow_html=True)
+        with s3:
+            st.markdown(f'<div class="metric-card"><div class="metric-label">Next Probable Vector</div><div class="metric-value" style="font-size:1.1rem;color:var(--accent-red)!important;">{sim_report.get("next_likely_move","Unknown")}</div></div>', unsafe_allow_html=True)
+    else:
+        st.markdown(f'<div style="font-size:0.88rem; line-height:1.7; color:var(--text-primary); background:#020b14; padding:15px; border:1px solid var(--border-dim); border-radius:4px; font-family:var(--font-body);">{sim_report}</div>', unsafe_allow_html=True)
+    st.divider()
+
 
 st.markdown('<div class="section-label">🤖 Agent Telemetry Diagnostics</div>', unsafe_allow_html=True)
 report = st.session_state.analysis_data
@@ -493,83 +528,101 @@ if report:
         "MEDIUM":   "metric-value-amber",
         "LOW":      "metric-value-green",
     }.get(severity, "metric-value")
+    
     if is_attack and is_blocked:
-            st.markdown('<div class="status-badge-mitigated">● INCIDENT MITIGATED — FIREWALL ACTIVE</div>', unsafe_allow_html=True)
+        st.markdown('<div class="status-badge-mitigated">● INCIDENT MITIGATED — FIREWALL ACTIVE</div>', unsafe_allow_html=True)
     elif is_attack and not is_blocked:
-            st.markdown('<div class="status-badge-attack">● VECTOR COMPROMISE IDENTIFIED</div>', unsafe_allow_html=True)
+        st.markdown('<div class="status-badge-attack">● VECTOR COMPROMISE IDENTIFIED</div>', unsafe_allow_html=True)
     else:
-            st.markdown('<div class="status-badge-safe">● ALL SYSTEMS NOMINAL</div>', unsafe_allow_html=True)
+        st.markdown('<div class="status-badge-safe">● ALL SYSTEMS NOMINAL</div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
     m1, m2, m3, m4 = st.columns(4)
     with m1:
-            st.markdown(f'<div class="metric-card"><div class="metric-label">Attack Type</div><div class="metric-value" style="font-size:1.1rem; padding: 4px 0;">{report.get("attack_type","None")}</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><div class="metric-label">Attack Type</div><div class="metric-value" style="font-size:1.1rem; padding: 4px 0;">{report.get("attack_type","None")}</div></div>', unsafe_allow_html=True)
     with m2:
-            st.markdown(f'<div class="metric-card"><div class="metric-label">Severity</div><div class="metric-value {sev_color}">{severity}</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><div class="metric-label">Severity</div><div class="metric-value {sev_color}">{severity}</div></div>', unsafe_allow_html=True)
     with m3:
-            st.markdown(f'<div class="metric-card"><div class="metric-label">Attacker IP</div><div class="metric-value" style="font-size:1.2rem;">{current_ip}</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="metric-card"><div class="metric-label">Attacker IP</div><div class="metric-value" style="font-size:1.2rem;">{current_ip}</div></div>', unsafe_allow_html=True)
     with m4:
-            conf_pct = int(confidence * 100)
-            st.markdown(
-                f'<div class="metric-card"><div class="metric-label">Confidence</div>'
-                f'<div class="metric-value">{conf_pct}%</div>'
-                f'<div class="confidence-bar-wrap"><div class="confidence-bar-fill" style="width:{conf_pct}%"></div></div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
+        conf_pct = int(confidence * 100)
+        st.markdown(
+            f'<div class="metric-card"><div class="metric-label">Confidence</div>'
+            f'<div class="metric-value">{conf_pct}%</div>'
+            f'<div class="confidence-bar-wrap"><div class="confidence-bar-fill" style="width:{conf_pct}%"></div></div>'
+            f'</div>',
+            unsafe_allow_html=True,
+        )
 
     st.markdown("<br>", unsafe_allow_html=True)
 
     tags_html = ""
     if mitre and mitre != "None":
-            tags_html += f'<span class="mitre-tag">MITRE ATT&CK: {mitre}</span>'
+        tags_html += f'<span class="mitre-tag">MITRE ATT&CK: {mitre}</span>'
     for tag in ioc_tags:
-            tags_html += f'<span class="ioc-tag">{tag}</span>'
+        tags_html += f'<span class="ioc-tag">{tag}</span>'
     if tags_html:
-            st.markdown(f'<div style="line-height:2.2; margin-bottom: 15px;">{tags_html}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="line-height:2.2; margin-bottom: 15px;">{tags_html}</div>', unsafe_allow_html=True)
 
     if endpoints:
-            st.markdown('<div class="section-label">Affected Endpoints</div>', unsafe_allow_html=True)
-            ep_html = "".join(
-                f'<code style="display:inline-block;margin:2px 4px;padding:2px 10px;'
-                f'background:#030f1a;border:1px solid var(--border-dim);border-radius:2px;'
-                f'font-family:var(--font-mono);font-size:0.75rem;color:var(--text-code)">{ep}</code>'
-                for ep in endpoints
-            )
-            st.markdown(f'<div style="line-height:2.4; margin-bottom: 15px;">{ep_html}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="section-label">Affected Endpoints</div>', unsafe_allow_html=True)
+        ep_html = "".join(
+            f'<code style="display:inline-block;margin:2px 4px;padding:2px 10px;'
+            f'background:#030f1a;border:1px solid var(--border-dim);border-radius:2px;'
+            f'font-family:var(--font-mono);font-size:0.75rem;color:var(--text-code)">{ep}</code>'
+            for ep in endpoints
+        )
+        st.markdown(f'<div style="line-height:2.4; margin-bottom: 15px;">{ep_html}</div>', unsafe_allow_html=True)
 
     st.divider()
     st.markdown('<div class="section-label">Incident Summary</div>', unsafe_allow_html=True)
     st.markdown(f'<p style="font-size:0.88rem;color:var(--text-primary);line-height:1.6; margin-bottom: 20px;">{report.get("summary","")}</p>', unsafe_allow_html=True)
 
-    payload_exp = report.get("payload_explanation", "None")
-    if payload_exp and payload_exp.lower() != "none":
-            with st.expander("🔎 Malicious Payload — Plain English Decoder", expanded=True):
+    payload_exp = report.get("payload_explanation", [])
+
+    if payload_exp:
+        formatted_points = ""
+        for point in payload_exp:
+            point = str(point).strip()
+            
+            # Clean out structural symbols automatically
+            point = point.replace("arrow down", "").replace("Arrow Down", "")
+            point = point.replace("↓", "").replace("➜", "").replace("➡", "").replace("->", "")
+            
+            if point:
+                formatted_points += f"<li>{point}</li>"
+
+        if formatted_points:
+            with st.expander("🛡️ Payload Threat Breakdown", expanded=True):
                 st.markdown(
-                    f'<div style="font-family:var(--font-body);font-size:0.86rem;line-height:1.7;'
-                    f'color:var(--text-primary);padding:4px 0">{payload_exp}</div>',
+                    f"""
+                    <div style="font-family: var(--font-body); font-size: 0.88rem; line-height: 1.8; color: var(--text-primary); padding: 6px 2px;">
+                        <ul style="padding-left:20px; margin-top:10px;">
+                            {formatted_points}
+                        </ul>
+                    </div>
+                    """,
                     unsafe_allow_html=True,
                 )
 
     if is_attack and is_blocked:
-            st.success(f"🔒 Blacklist Rule Pushed: IP Address `{current_ip}` has been dropped at the perimeter firewall. Session terminated.")
-            
+        st.success(f"🔒 Blacklist Rule Pushed: IP Address `{current_ip}` has been dropped at the perimeter firewall. Session terminated.")
     elif is_attack and not is_blocked:
-            st.divider()
-            st.markdown('<div class="section-label">🛡️ Response & Firewall Orchestration</div>', unsafe_allow_html=True)
+        st.divider()
+        st.markdown('<div class="section-label">🛡️ Response & Firewall Orchestration</div>', unsafe_allow_html=True)
 
-            if autonomous_mode:
-                st.session_state.blocked_ips.add(current_ip)
-                st.rerun()
-            else:
-                st.info(f"**Proposed Directive:** {report.get('recommended_action','')}")
-                approve_col, _ = st.columns([1, 1])
-                with approve_col:
-                    if st.button("✅ Approve & Execute Countermeasure", type="primary", use_container_width=True):
-                        st.session_state.blocked_ips.add(current_ip)
-                        st.balloons()
-                        time.sleep(1.5)
-                        st.rerun()
+        if autonomous_mode:
+            st.session_state.blocked_ips.add(current_ip)
+            st.rerun()
+        else:
+            st.info(f"**Proposed Directive:** {report.get('recommended_action','')}")
+            approve_col, _ = st.columns([1, 1])
+            with approve_col:
+                if st.button("✅ Approve & Execute Countermeasure", type="primary", use_container_width=True):
+                    st.session_state.blocked_ips.add(current_ip)
+                    st.balloons()
+                    time.sleep(1.5)
+                    st.rerun()
 
 elif st.session_state.audit_ran:
     st.caption("Analysis returned no data. Retry the forensic audit.")
