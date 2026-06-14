@@ -1,8 +1,8 @@
 # 🛡️ SentinelAI 
 
-SentinelAI is a real-time, proactive cyber-defense platform designed to help security analysts outmaneuver threats. 
+*SentinelAI is a real-time, proactive cyber-defense platform designed to help security analysts outmaneuver threats. 
 Instead of waiting for security teams to parse through thousands of messy, raw server log lines during a breach, our platform uses an intelligent 
-backend pipeline to instantly structure the logs, predict the attacker's next move, and push automated firewall countermeasures to contain the incident in seconds.
+backend pipeline to instantly structure the logs, predict the attacker's next move, and push automated firewall countermeasures to contain the incident in seconds.*
 ---
 
 # ⚡ Key Features
