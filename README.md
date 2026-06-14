@@ -1,11 +1,11 @@
-# 🛡️ SentinelAI // Autonomous SOC Command
+# 🛡️ SentinelAI 
 
 SentinelAI is a real-time, proactive cyber-defense platform designed to help security analysts outmaneuver threats. 
 Instead of waiting for security teams to parse through thousands of messy, raw server log lines during a breach, our platform uses an intelligent 
 backend pipeline to instantly structure the logs, predict the attacker's next move, and push automated firewall countermeasures to contain the incident in seconds.
 ---
 
-## ⚡ Key Features
+# ⚡ Key Features
 
 * **Live Log Stream Hooking:** Feeds raw server syslog arrays directly into an analytical engine.
 * **Proactive Threat Modeler:** Reconstructs the attacker's progression step-by-step to calculate their system dwell time and predict their next target.
